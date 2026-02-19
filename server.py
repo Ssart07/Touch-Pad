@@ -3,6 +3,7 @@ import eventlet
 # may use networking or threading. Do this early.
 eventlet.monkey_patch()
 
+import logging
 from flask import Flask, send_from_directory
 from flask_socketio import SocketIO
 import pyautogui
@@ -10,6 +11,8 @@ import ctypes
 import socket
 
 pyautogui.FAILSAFE = False
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 app = Flask(__name__, static_folder='static')
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet')
@@ -25,30 +28,37 @@ def on_move(data):
     try:
         dx = float(data.get('dx', 0))
         dy = float(data.get('dy', 0))
-        print(f"Received move dx={dx} dy={dy}")
+        logging.info(f"Received move dx={dx} dy={dy}")
         pyautogui.moveRel(dx, dy)
     except Exception as e:
-        print('move error', e)
+        logging.exception('move error')
 
 
 @socketio.on('click')
 def on_click(data):
     button = data.get('button', 'left')
     try:
-        print(f"Received click button={button}")
-        pyautogui.click(button=button)
+        logging.info(f"Received click button={button}")
+        if data.get('action') == 'down':
+            pyautogui.mouseDown(button=button)
+        elif data.get('action') == 'up':
+            pyautogui.mouseUp(button=button)
+        elif data.get('action') == 'double':
+            pyautogui.doubleClick(button=button)
+        else:
+            pyautogui.click(button=button)
     except Exception as e:
-        print('click error', e)
+        logging.exception('click error')
 
 
 @socketio.on('scroll')
 def on_scroll(data):
     try:
         dy = int(data.get('dy', 0))
-        print(f"Received scroll dy={dy}")
+        logging.info(f"Received scroll dy={dy}")
         pyautogui.scroll(dy)
     except Exception as e:
-        print('scroll error', e)
+        logging.exception('scroll error')
 
 
 # Volume via Windows keybd_event
@@ -69,7 +79,7 @@ VK_VOLUME_DOWN = 0xAE
 def on_volume(data):
     action = data.get('action')
     try:
-        print(f"Received volume action={action}")
+        logging.info(f"Received volume action={action}")
         if action == 'up':
             key_event(VK_VOLUME_UP)
         elif action == 'down':
@@ -77,7 +87,27 @@ def on_volume(data):
         elif action == 'mute':
             key_event(VK_VOLUME_MUTE)
     except Exception as e:
-        print('volume error', e)
+        logging.exception('volume error')
+
+
+@socketio.on('drag_start')
+def on_drag_start(data):
+    button = data.get('button', 'left')
+    try:
+        logging.info(f"Received drag_start button={button}")
+        pyautogui.mouseDown(button=button)
+    except Exception:
+        logging.exception('drag_start error')
+
+
+@socketio.on('drag_end')
+def on_drag_end(data):
+    button = data.get('button', 'left')
+    try:
+        logging.info(f"Received drag_end button={button}")
+        pyautogui.mouseUp(button=button)
+    except Exception:
+        logging.exception('drag_end error')
 
 
 def find_free_port(start=5000, end=5100):
