@@ -3,8 +3,28 @@ import eventlet
 # may use networking or threading. Do this early.
 eventlet.monkey_patch()
 
+# Compatibility shim: in newer Python versions `pkgutil.get_loader` may be
+# missing; provide a thin wrapper that returns the loader from importlib.
+# This avoids older libraries (like some Flask versions) that call
+# `pkgutil.get_loader(...)` directly.
+import pkgutil
+import importlib.util
+if not hasattr(pkgutil, 'get_loader'):
+    def _compat_get_loader(name):
+        # importlib.util.find_spec can raise ValueError for __main__ in
+        # certain execution contexts; guard against that and return None
+        # when the loader cannot be determined.
+        try:
+            if name == '__main__':
+                return None
+            spec = importlib.util.find_spec(name)
+            return getattr(spec, 'loader', None) if spec is not None else None
+        except Exception:
+            return None
+    pkgutil.get_loader = _compat_get_loader
+
 import logging
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request
 from flask_socketio import SocketIO
 import pyautogui
 import ctypes
@@ -22,6 +42,14 @@ socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
 
+@socketio.on('connect')
+def handle_connect():
+    logging.info(f"Client connected: {socketio.server.manager.sid_namespace}")  # fallback
+    logging.info("Client connected")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logging.info("Client disconnected")
 
 @socketio.on('move')
 def on_move(data):
@@ -108,6 +136,28 @@ def on_drag_end(data):
         pyautogui.mouseUp(button=button)
     except Exception:
         logging.exception('drag_end error')
+
+
+# Connection logging for debugging
+@socketio.on('connect')
+def handle_connect():
+    try:
+        logging.info(f"Client connected: sid={request.sid} addr={request.remote_addr}")
+    except Exception:
+        logging.info("Client connected (no request info)")
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    try:
+        logging.info(f"Client disconnected: sid={request.sid}")
+    except Exception:
+        logging.info("Client disconnected")
+
+
+@socketio.on_error_default
+def default_error_handler(e):
+    logging.exception('socketio error')
 
 
 def find_free_port(start=5000, end=5100):
