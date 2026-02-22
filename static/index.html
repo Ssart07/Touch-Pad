@@ -24,6 +24,8 @@
       #status{margin-left:0;order:999;width:100%;text-align:center;background:#ffdede;border-color:#ffb2b2}
       #pad{font-size:14px}
     }
+    /* Prevent browser swipe-to-go-back / overscroll gestures */
+    html, body, #pad { overscroll-behavior: none; }
   </style>
 </head>
 <body>
@@ -38,6 +40,14 @@
     <label for="sensitivity">Sensibilidad
       <input id="sensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
     </label>
+    <label id="profiles-label">Perfiles
+      <select id="profiles"></select>
+      <button id="save-profile">Guardar</button>
+    </label>
+    <button id="keyboard-toggle">Teclado</button>
+    <input id="keyboard-input" type="text" placeholder="Escribe y presiona Enter" style="display:none;flex:1">
+    <button id="clipboard-to-pc">Enviar Clipboard a PC</button>
+    <button id="clipboard-from-pc">Pedir Clipboard PC</button>
     <div id="status">Desconectado</div>
   </div>
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
